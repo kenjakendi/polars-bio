@@ -410,10 +410,11 @@ fn py_from_polars(
 }
 
 #[pyfunction]
-#[pyo3(signature = (py_ctx,))]
-fn kmer_count(
+#[pyo3(signature = (py_ctx, k,))]
+fn py_kmer_count(
     py: Python<'_>,
     py_ctx: &PyBioSessionContext,
+    k: usize,
 ) -> PyResult<PyDataFrame> {
     py.allow_threads(|| {
         let rt = Runtime::new().unwrap();
@@ -425,7 +426,6 @@ fn kmer_count(
                 "GGCATCGATCGTTA",
                 "TTAACCGGTTGGAA",
             ];
-            let k = 3;
 
             let array = Arc::new(StringArray::from(dna_sequences)) as ArrayRef;
             let schema = Arc::new(Schema::new(vec![
@@ -444,7 +444,7 @@ fn kmer_count(
             ctx.register_udaf(kmer_udaf);
 
             let table = MemTable::try_new(batch.schema(), vec![vec![batch]]).unwrap();
-            ctx.register_table("sequences", Arc::new(table));
+            let _ = ctx.register_table("sequences", Arc::new(table));
 
             let df = ctx.sql("SELECT kmer_count(sequence) AS kmer_counts FROM sequences").await.unwrap();
             df
@@ -467,7 +467,7 @@ fn polars_bio(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_describe_vcf, m)?)?;
     m.add_function(wrap_pyfunction!(py_register_view, m)?)?;
     m.add_function(wrap_pyfunction!(py_from_polars, m)?)?;
-    m.add_function(wrap_pyfunction!(kmer_count, m)?)?;
+    m.add_function(wrap_pyfunction!(py_kmer_count, m)?)?;
     // m.add_function(wrap_pyfunction!(unary_operation_scan, m)?)?;
     m.add_class::<PyBioSessionContext>()?;
     m.add_class::<FilterOp>()?;

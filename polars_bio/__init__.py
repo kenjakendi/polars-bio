@@ -45,4 +45,5 @@ __all__ = [
     "ReadOptions",
     "VcfReadOptions",
     "set_option",
+    "kmer_count",
 ]
