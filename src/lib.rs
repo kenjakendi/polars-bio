@@ -6,10 +6,14 @@ mod scan;
 mod streaming;
 mod udtf;
 mod utils;
+mod kmer;
 
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
 
+use arrow_array::{ArrayRef, StringArray};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
 use datafusion::arrow::ffi_stream::ArrowArrayStreamReader;
 use datafusion::arrow::pyarrow::PyArrowType;
 use datafusion::datasource::MemTable;
@@ -30,6 +34,8 @@ use crate::option::{
 use crate::scan::{maybe_register_table, register_frame, register_table};
 use crate::streaming::RangeOperationScan;
 use crate::utils::convert_arrow_rb_schema_to_polars_df_schema;
+use datafusion::logical_expr::{create_udaf, Volatility};
+use crate::kmer::KmerAccumulator;
 
 const LEFT_TABLE: &str = "s1";
 const RIGHT_TABLE: &str = "s2";
@@ -403,6 +409,50 @@ fn py_from_polars(
     })
 }
 
+#[pyfunction]
+#[pyo3(signature = (py_ctx,))]
+fn kmer_count(
+    py: Python<'_>,
+    py_ctx: &PyBioSessionContext,
+) -> PyResult<PyDataFrame> {
+    py.allow_threads(|| {
+        let rt = Runtime::new().unwrap();
+        let ctx = &py_ctx.ctx.session;
+
+        let df = rt.block_on(async {
+            let dna_sequences = vec![
+                "ATGCGTACGTTAGC",
+                "GGCATCGATCGTTA",
+                "TTAACCGGTTGGAA",
+            ];
+            let k = 3;
+
+            let array = Arc::new(StringArray::from(dna_sequences)) as ArrayRef;
+            let schema = Arc::new(Schema::new(vec![
+                Field::new("sequence", arrow_schema::DataType::Utf8, false),
+            ]));
+            let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
+
+            let kmer_udaf = create_udaf(
+                "kmer_count",
+                vec![DataType::Utf8],
+                Arc::new(DataType::Utf8),
+                Volatility::Immutable,
+                Arc::new(move |_| Ok(Box::new(KmerAccumulator::new(k)))),
+                Arc::new(vec![DataType::Utf8]),
+            );
+            ctx.register_udaf(kmer_udaf);
+
+            let table = MemTable::try_new(batch.schema(), vec![vec![batch]]).unwrap();
+            ctx.register_table("sequences", Arc::new(table));
+
+            let df = ctx.sql("SELECT kmer_count(sequence) AS kmer_counts FROM sequences").await.unwrap();
+            df
+        });
+        Ok(PyDataFrame::new(df))
+    })
+}
+
 #[pymodule]
 fn polars_bio(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     pyo3_log::init();
@@ -417,6 +467,7 @@ fn polars_bio(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_describe_vcf, m)?)?;
     m.add_function(wrap_pyfunction!(py_register_view, m)?)?;
     m.add_function(wrap_pyfunction!(py_from_polars, m)?)?;
+    m.add_function(wrap_pyfunction!(kmer_count, m)?)?;
     // m.add_function(wrap_pyfunction!(unary_operation_scan, m)?)?;
     m.add_class::<PyBioSessionContext>()?;
     m.add_class::<FilterOp>()?;
