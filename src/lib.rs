@@ -11,9 +11,7 @@ mod kmer;
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
 
-use arrow_array::{ArrayRef, StringArray};
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
+use arrow::datatypes::{DataType};
 use datafusion::arrow::ffi_stream::ArrowArrayStreamReader;
 use datafusion::arrow::pyarrow::PyArrowType;
 use datafusion::datasource::MemTable;
@@ -39,6 +37,7 @@ use crate::kmer::KmerAccumulator;
 
 const LEFT_TABLE: &str = "s1";
 const RIGHT_TABLE: &str = "s2";
+const KMER_TABLE: &str = "kmer";
 const DEFAULT_COLUMN_NAMES: [&str; 3] = ["contig", "start", "end"];
 
 #[pyfunction]
@@ -410,29 +409,20 @@ fn py_from_polars(
 }
 
 #[pyfunction]
-#[pyo3(signature = (py_ctx, k,))]
+#[pyo3(signature = (py_ctx, k, data))]
 fn py_kmer_count(
     py: Python<'_>,
     py_ctx: &PyBioSessionContext,
     k: usize,
+    data: PyArrowType<ArrowArrayStreamReader>,
 ) -> PyResult<PyDataFrame> {
     py.allow_threads(|| {
+        register_frame(py_ctx, data, KMER_TABLE.to_string());
+
         let rt = Runtime::new().unwrap();
         let ctx = &py_ctx.ctx.session;
 
         let df = rt.block_on(async {
-            let dna_sequences = vec![
-                "ATGCGTACGTTAGC",
-                "GGCATCGATCGTTA",
-                "TTAACCGGTTGGAA",
-            ];
-
-            let array = Arc::new(StringArray::from(dna_sequences)) as ArrayRef;
-            let schema = Arc::new(Schema::new(vec![
-                Field::new("sequence", arrow_schema::DataType::Utf8, false),
-            ]));
-            let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
-
             let kmer_udaf = create_udaf(
                 "kmer_count",
                 vec![DataType::Utf8],
@@ -443,10 +433,7 @@ fn py_kmer_count(
             );
             ctx.register_udaf(kmer_udaf);
 
-            let table = MemTable::try_new(batch.schema(), vec![vec![batch]]).unwrap();
-            let _ = ctx.register_table("sequences", Arc::new(table));
-
-            let df = ctx.sql("SELECT kmer_count(sequence) AS kmer_counts FROM sequences").await.unwrap();
+            let df = ctx.sql(&format!("SELECT kmer_count(sequence) AS kmer_counts FROM {}", KMER_TABLE)).await.unwrap();
             df
         });
         Ok(PyDataFrame::new(df))

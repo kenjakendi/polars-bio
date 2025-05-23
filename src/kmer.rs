@@ -32,6 +32,9 @@ impl Accumulator for KmerAccumulator {
                 if let Some(seq) = string_array.value(i).into() {
                     for j in 0..=(seq.len().saturating_sub(self.k)) {
                         let kmer = &seq[j..j + self.k];
+                        if kmer.contains('N') {
+                            continue;
+                        }
                         *self.counts.entry(kmer.to_string()).or_insert(0) += 1;
                     }
                 }
