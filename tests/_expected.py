@@ -78,6 +78,51 @@ EXPECTED_COUNT_OVERLAPS = """
         +--------+-----------+---------+-------+
 """
 
+EXPECTED_KMER_2_TEST = """
+        +------+-------+
+        | kmer | count |
+        +------+-------+
+        | AA   | 4     |
+        | AC   | 2     |
+        | AG   | 4     |
+        | AT   | 4     |
+        | CA   | 4     |
+        | CG   | 1     |
+        | CT   | 1     |
+        | GA   | 2     |
+        | GC   | 1     |
+        | GG   | 4     |
+        | GT   | 5     |
+        | TA   | 3     |
+        | TC   | 3     |
+        | TG   | 2     |
+        | TT   | 3     |
+        +------+-------+
+"""
+
+EXPECTED_KMER_2_EXAMPLE = """
+        +------+-------+
+        | kmer | count |
+        +------+-------+
+        | AA   | 1426  |
+        | AC   | 1006  |
+        | AG   | 1476  |
+        | AT   | 1203  |
+        | CA   | 1473  |
+        | CC   | 1310  |
+        | CG   |  396  |
+        | CT   | 1472  |
+        | GA   | 1313  |
+        | GC   | 1054  |
+        | GG   | 1253  |
+        | GT   | 1044  |
+        | TA   | 917   |
+        | TC   | 1261  |
+        | TG   | 1522  |
+        | TT   | 1552  |
+        +------+-------+
+"""
+
 # Pandas
 PD_DF_OVERLAP = (
     mdpd.from_md(EXPECTED_OVERLAP)
@@ -106,7 +151,16 @@ PD_DF_COUNT_OVERLAPS = (
     .astype({"pos_end": "int64"})
     .astype({"count": "int64"})
 )
-
+PD_KMER_2_TEST = (
+    mdpd.from_md(EXPECTED_KMER_2_TEST)
+    .astype({"kmer": "object"})
+    .astype({"count": "int64"})
+)
+PD_KMER_2_EXAMPLE = (
+    mdpd.from_md(EXPECTED_KMER_2_EXAMPLE)
+    .astype({"kmer": "object"})
+    .astype({"count": "int64"})
+)
 
 PD_DF_OVERLAP = PD_DF_OVERLAP.sort_values(by=list(PD_DF_OVERLAP.columns)).reset_index(
     drop=True
