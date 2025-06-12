@@ -24,7 +24,7 @@ tokio = {version = "1.42.0", features = ["full", "tracing"]}
 log = "0.4.22"
 tracing = { version = "0.1.41", features = ["log"] }
 futures-util = "0.3.31"
-
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 
 polars = { git = "https://github.com/mwiewior/polars.git" , rev = "9d4fca54b1d71fce08a51cf00a88f67c67313706"}

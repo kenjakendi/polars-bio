@@ -13,6 +13,7 @@ from .io import (
     register_view,
     sql,
 )
+from .kmer import kmer_count, visualize_kmers
 from .polars_ext import PolarsRangesOperations as LazyFrame
 from .range_op import FilterOp, count_overlaps, coverage, merge, nearest, overlap
 from .range_viz import visualize_intervals
@@ -45,4 +46,6 @@ __all__ = [
     "ReadOptions",
     "VcfReadOptions",
     "set_option",
+    "kmer_count",
+    "visualize_kmers",
 ]
